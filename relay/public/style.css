@@ -1,0 +1,126 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+.wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card.inner {
+  background: #18212d;
+  margin-top: 8px;
+}
+
+h1, h2, h3 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+input, select, textarea, button {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: 1px solid #4b5563;
+  background: #111827;
+  color: #f3f4f6;
+  padding: 10px 12px;
+}
+
+button {
+  width: auto;
+  min-width: 120px;
+  cursor: pointer;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px 12px;
+}
+
+dt {
+  color: #9ca3af;
+}
+
+dd {
+  margin: 0;
+}
+
+.history {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.muted {
+  color: #9ca3af;
+}
+
+.small {
+  font-size: 0.92rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.preview pre {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #374151;
+}
+
+.status.ok {
+  color: #bbf7d0;
+  border-color: #166534;
+  background: #052e16;
+}
+
+.status.error {
+  color: #fecaca;
+  border-color: #991b1b;
+  background: #450a0a;
+}

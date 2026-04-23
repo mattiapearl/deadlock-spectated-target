@@ -1,0 +1,15 @@
+{
+  "name": "deadlock-spectated-target-relay",
+  "version": "1.0.0",
+  "description": "Minimal relay for Deadlock spectated target addon output",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --port 5010",
+    "test": "node --test parser.test.js"
+  },
+  "dependencies": {
+    "ably": "^2.21.0"
+  },
+  "license": "MIT"
+}

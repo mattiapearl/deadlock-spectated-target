@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deadlock vMix Bridge</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>Deadlock vMix Bridge</h1>
+    <p class="muted">Caster-side bridge: subscribes to Ably and writes the current target into local vMix.</p>
+
+    <section class="card">
+      <h2>Status</h2>
+      <dl class="grid">
+        <dt>Ably</dt><dd id="status-ably">idle</dd>
+        <dt>Received events</dt><dd id="status-count">0</dd>
+        <dt>Last message</dt><dd id="status-last-message">—</dd>
+        <dt>Last vMix text</dt><dd id="status-vmix-text">—</dd>
+        <dt>Last vMix error</dt><dd id="status-vmix-error">—</dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h2>Current event</h2>
+      <div id="current-empty" class="muted">No event received yet.</div>
+      <dl id="current" class="grid hidden">
+        <dt>Spectated</dt><dd id="current-spectated"></dd>
+        <dt>Player</dt><dd id="current-player"></dd>
+        <dt>Hero</dt><dd id="current-hero"></dd>
+        <dt>Team</dt><dd id="current-team"></dd>
+        <dt>Timestamp</dt><dd id="current-time"></dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <form id="config-form">
+        <div class="row">
+          <label>
+            Ably API key
+            <input id="ablyApiKey" type="password" placeholder="subscribe key">
+          </label>
+          <label>
+            Ably client ID
+            <input id="ablyClientId" type="text" placeholder="caster-vmix-bridge">
+          </label>
+        </div>
+
+        <label>
+          Ably channel
+          <input id="ablyChannel" type="text" placeholder="deadlock.spectated-target">
+        </label>
+
+        <div class="row">
+          <label>
+            vMix API base URL
+            <input id="vmixBaseUrl" type="text" placeholder="http://127.0.0.1:8088/API">
+          </label>
+          <label>
+            vMix input name or GUID
+            <input id="vmixInput" type="text" placeholder="Title1 or GUID">
+          </label>
+        </div>
+
+        <div class="row">
+          <label>
+            vMix field name
+            <input id="vmixSelectedName" type="text" placeholder="Headline.Text">
+          </label>
+          <label>
+            Text template
+            <input id="vmixTemplate" type="text" placeholder="{spectated_name}">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Save and reconnect</button>
+          <button type="button" id="test-vmix">Test vMix write</button>
+        </div>
+      </form>
+
+      <div class="preview">
+        <h3>Text preview</h3>
+        <pre id="preview">{spectated_name}</pre>
+      </div>
+
+      <div id="status-message" class="status muted">Idle.</div>
+    </section>
+
+    <section class="card">
+      <h2>Incoming events</h2>
+      <ul id="history" class="history"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

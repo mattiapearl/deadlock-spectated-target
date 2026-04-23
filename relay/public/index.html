@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deadlock Spectated Target Relay</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>Deadlock Spectated Target Relay</h1>
+    <p class="muted">Minimal relay for the <code>[SPEC_Target]</code> console output.</p>
+
+    <section class="card">
+      <h2>Current target</h2>
+      <div id="current-empty" class="muted">No target seen yet.</div>
+      <dl id="current" class="grid hidden">
+        <dt>Spectated</dt><dd id="current-spectated"></dd>
+        <dt>Player</dt><dd id="current-player"></dd>
+        <dt>Hero</dt><dd id="current-hero"></dd>
+        <dt>Team</dt><dd id="current-team"></dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h2>Destination</h2>
+      <form id="config-form">
+        <label>
+          Log path
+          <input id="logPath" name="logPath" type="text">
+        </label>
+
+        <div class="row">
+          <label>
+            Enabled
+            <select id="enabled" name="enabled">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </label>
+
+          <label>
+            Destination type
+            <select id="type" name="type">
+              <option value="disabled">Disabled</option>
+              <option value="webhook">Webhook</option>
+              <option value="post">HTTP POST</option>
+              <option value="google_apps_script">Google Apps Script / Sheets</option>
+              <option value="ably_pubsub">Ably Pub/Sub</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          URL
+          <input id="url" name="url" type="url" placeholder="https://example.com/webhook">
+        </label>
+
+        <label>
+          Headers JSON
+          <textarea id="headers" name="headers" rows="6" spellcheck="false">{}</textarea>
+        </label>
+
+        <div class="card inner hidden" id="ably-fields">
+          <h3>Ably Pub/Sub</h3>
+          <label>
+            Publisher API key
+            <input id="ablyApiKey" name="ablyApiKey" type="password" placeholder="xxxxx.yyyyy:zzzzz">
+          </label>
+          <div class="row">
+            <label>
+              Channel
+              <input id="ablyChannel" name="ablyChannel" type="text" placeholder="deadlock.spectated-target">
+            </label>
+            <label>
+              Client ID
+              <input id="ablyClientId" name="ablyClientId" type="text" placeholder="observer-relay">
+            </label>
+          </div>
+          <p class="muted small">
+            Recommended roles: developer owns the Ably app, observer gets a publish-capable key for this relay, caster gets a subscribe-only key for the vMix bridge.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="test-send">Test send</button>
+        </div>
+      </form>
+
+      <p class="muted small">
+        Direct Google Docs writing is not built into the relay. For Google, use a Google Apps Script or Sheets webhook URL here. For the three-person setup, Ably Pub/Sub is the preferred mode.
+      </p>
+
+      <div class="preview">
+        <h3>Payload preview</h3>
+        <pre id="payload-preview">{}</pre>
+      </div>
+
+      <div id="status" class="status muted">Idle.</div>
+    </section>
+
+    <section class="card">
+      <h2>Recent targets</h2>
+      <ul id="history" class="history"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

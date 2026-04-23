@@ -1,0 +1,15 @@
+{
+  "name": "deadlock-spectated-target-vmix-bridge",
+  "version": "1.0.0",
+  "description": "Ably subscriber bridge that writes spectated target updates into local vMix",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "check": "node --check bridge.js && node --check helpers.js && node --check public/app.js",
+    "test": "node --test helpers.test.js"
+  },
+  "dependencies": {
+    "ably": "^2.21.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,14 @@
+{
+  "logPath": "C:/Program Files (x86)/Steam/steamapps/common/Deadlock/game/citadel/console.log",
+  "destination": {
+    "enabled": false,
+    "type": "disabled",
+    "url": "",
+    "headers": {},
+    "ably": {
+      "apiKey": "",
+      "channel": "deadlock.spectated-target",
+      "clientId": "observer-relay"
+    }
+  }
+}
