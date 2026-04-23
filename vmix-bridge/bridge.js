@@ -167,16 +167,17 @@ async function handleIncomingMessage(eventName, rawData) {
     };
 
     addHistory(historyEntry);
+    broadcastSSE({ type: "target", state });
 
     try {
         const text = await updateVmix(target);
         console.log(`[VMIX-BRIDGE] Updated vMix: ${text}`);
+        broadcastSSE({ type: "vmix_updated", state });
     } catch (error) {
         state.last_vmix_error = String(error && error.message ? error.message : error);
         console.error("[VMIX-BRIDGE] Update failed:", state.last_vmix_error);
+        broadcastSSE({ type: "vmix_error", state });
     }
-
-    broadcastSSE({ type: "target", state });
 }
 
 async function connectAbly() {
