@@ -11,6 +11,7 @@ const {
     findMappingForTarget,
     addAvailableUsername,
     buildVmixCall,
+    buildVmixNicknameCall,
 } = require("./helpers.js");
 
 test("buildDefaultMappings creates 12 empty rows", () => {
@@ -57,6 +58,28 @@ test("addAvailableUsername deduplicates seen names", () => {
     list = addAvailableUsername(list, { spectated_name: "b3an" });
     list = addAvailableUsername(list, { player_name: "Other" });
     assert.deepEqual(list, ["B3AN", "Other"]);
+});
+
+test("buildVmixNicknameCall creates encoded SetText request for unicode nicknames", () => {
+    const built = buildVmixNicknameCall({
+        vmix: {
+            baseUrl: "http://127.0.0.1:8088/API",
+            nickname: {
+                input: "86",
+                selectedName: "Nickname.Text",
+            },
+        },
+    }, { spectated_name: "филяй филяй & \"quoted\"" });
+
+    assert.equal(built.functionName, "SetText");
+    assert.equal(built.input, "86");
+    assert.equal(built.selectedName, "Nickname.Text");
+    assert.equal(built.value, "филяй филяй & \"quoted\"");
+    assert.match(built.url, /Function=SetText/);
+    assert.match(built.url, /Input=86/);
+    assert.match(built.url, /SelectedName=Nickname\.Text/);
+    assert.equal(new URL(built.url).searchParams.get("Value"), "филяй филяй & \"quoted\"");
+    assert.equal(built.scriptCall, 'API.Function("SetText", Input:="86", SelectedName:="Nickname.Text", Value:="филяй филяй & ""quoted""")');
 });
 
 test("buildVmixCall creates SetLayer request and script syntax", () => {

@@ -20,8 +20,10 @@
         <dt>Last message</dt><dd id="status-last-message">—</dd>
         <dt>Last match</dt><dd id="status-last-match">—</dd>
         <dt>Last unmapped</dt><dd id="status-last-unmapped">—</dd>
-        <dt>Last vMix call</dt><dd id="status-vmix-call">—</dd>
-        <dt>Last vMix error</dt><dd id="status-vmix-error">—</dd>
+        <dt>Last layer call</dt><dd id="status-vmix-call">—</dd>
+        <dt>Last layer error</dt><dd id="status-vmix-error">—</dd>
+        <dt>Last nickname</dt><dd id="status-nickname-call">—</dd>
+        <dt>Last nickname error</dt><dd id="status-nickname-error">—</dd>
       </dl>
     </section>
 
@@ -91,6 +93,27 @@
         <p class="muted small">
           vMix research note: <code>API.Function(functionName, input, value, ...)</code> maps to the HTTP Web API. The bridge sends the mapping <strong>value</strong> raw to the chosen function. For your production setup, that value can be the camera number (for example <code>100</code>). If a different input expects <code>Index,Input</code> syntax as described in the shortcut reference, enter that raw string instead. Set <strong>Unmapped fallback value</strong> to a safe camera/blank value so unmapped players do not leave vMix stuck on the previous mapped player.
         </p>
+
+        <h3>Nickname SetText</h3>
+        <p class="muted small">Optional second vMix call for the displayed nickname. The nickname value is the current spectated name and is URL-encoded safely for spaces, quotes, symbols, and Russian characters.</p>
+        <label class="checkbox-row">
+          <input id="nicknameEnabled" type="checkbox">
+          Enable nickname SetText call
+        </label>
+        <div class="row">
+          <label>
+            Nickname API base URL
+            <input id="nicknameBaseUrl" type="text" placeholder="blank = use vMix API base URL">
+          </label>
+          <label>
+            Nickname input
+            <input id="nicknameInput" type="text" placeholder="86">
+          </label>
+        </div>
+        <label>
+          Nickname selected name
+          <input id="nicknameSelectedName" type="text" placeholder="Nickname.Text">
+        </label>
 
         <h3>Username → Value mapping table</h3>
         <p class="muted small">Username cells are searchable. Type in the username box to filter observed names, use the per-row choose dropdown, or click a username chip above to fill the focused/first empty row.</p>

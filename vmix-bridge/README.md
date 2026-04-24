@@ -46,6 +46,7 @@ So the bridge sends the configured mapping **value** raw to vMix, unchanged. Tha
 - keeps a live list of **available usernames** seen in the current game
 - provides a **12-row mapping table** for `username -> raw vMix value`
 - supports an **unmapped fallback value** so unmapped players do not leave vMix on the previous mapped camera
+- optionally sends a second `SetText` nickname call to a separate vMix input/field
 - lets the caster **clear available usernames** when a new game starts
 - sends mapped values to vMix using the configured function and static input
 - shows incoming events and current routing state in a local UI
@@ -82,6 +83,12 @@ Use the local UI, or copy `config.example.json` to local-only `config.json` and 
     "functionName": "SetLayer",
     "input": "67",
     "unmappedValue": "0",
+    "nickname": {
+      "enabled": true,
+      "baseUrl": "",
+      "input": "86",
+      "selectedName": "Nickname.Text"
+    },
     "mappings": [
       { "username": "PlayerOne", "value": "100" },
       { "username": "PlayerTwo", "value": "101" }
@@ -111,6 +118,7 @@ The local UI lets the caster:
 - modify vMix settings
 - edit the 12-row username/value mapping table with searchable username inputs and per-row choose dropdowns
 - set an unmapped fallback value for players without mapping rows
+- enable a second nickname `SetText` call for a separate input/field
 - see connection status
 - view incoming events/history
 - view the available usernames in the current game
@@ -148,6 +156,20 @@ http://127.0.0.1:8088/API/?Function=SetLayer&Input=67&Value=100
 ```
 
 Set `unmappedValue` to a safe blank/default camera value, for example `0` or whatever your vMix preset uses. Leave it blank only if unmapped players should send no command.
+
+If nickname output is enabled, each target change also sends:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=<nicknameInput>&SelectedName=<nicknameField>&Value=<spectatedName>
+```
+
+Example:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=86&SelectedName=Nickname.Text&Value=EXAMPLE
+```
+
+The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, symbols, and Russian characters are safe.
 
 ## Example flow
 

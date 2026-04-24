@@ -194,6 +194,7 @@ http://localhost:5015
 - keeps a live list of usernames seen in the current game
 - provides a 12-row `username -> value` mapping table with searchable username inputs and choose dropdowns
 - supports an unmapped fallback value so unmapped players do not leave vMix on the previous mapped camera
+- optionally sends a second `SetText` nickname call to a separate vMix input/field
 - clears available usernames for a new game with one click
 - writes to local vMix via a configured shortcut function such as `SetLayer`
 - local UI to modify settings
@@ -218,6 +219,12 @@ Use the vMix bridge UI, or copy `vmix-bridge/config.example.json` to local-only 
     "functionName": "SetLayer",
     "input": "67",
     "unmappedValue": "0",
+    "nickname": {
+      "enabled": true,
+      "baseUrl": "",
+      "input": "86",
+      "selectedName": "Nickname.Text"
+    },
     "mappings": [
       { "username": "PlayerOne", "value": "100" },
       { "username": "PlayerTwo", "value": "101" }
@@ -247,6 +254,20 @@ http://127.0.0.1:8088/API/?Function=SetLayer&Input=67&Value=100
 The mapping value is sent raw. So if your production wants `100`, enter `100`. If a particular vMix input later expects something like `1,100`, enter exactly that string in the mapping table.
 
 Set `unmappedValue` / **Unmapped fallback value** to a safe blank/default camera value. When the spectated player has no mapping row, the bridge sends this fallback instead of leaving vMix stuck on the previously mapped player. Leave it blank only if you intentionally want unmapped players to send no vMix command.
+
+If nickname output is enabled, the bridge also sends a second call:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=<nicknameInput>&SelectedName=<nicknameField>&Value=<spectatedName>
+```
+
+Example:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=86&SelectedName=Nickname.Text&Value=EXAMPLE
+```
+
+The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, symbols, and Russian characters are safe.
 
 ## Settings persistence
 

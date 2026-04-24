@@ -82,6 +82,10 @@ function addAvailableUsername(list, target) {
     return next;
 }
 
+function escapeVmixScriptString(value) {
+    return String(value || "").replace(/"/g, '""');
+}
+
 function buildVmixCall(config, mappingValue) {
     const vmix = config.vmix || {};
     const functionName = String(vmix.functionName || "SetLayer").trim() || "SetLayer";
@@ -102,7 +106,39 @@ function buildVmixCall(config, mappingValue) {
         input,
         value,
         url: url.toString(),
-        scriptCall: `API.Function("${functionName}", Input:="${input}", Value:="${value}")`,
+        scriptCall: `API.Function("${escapeVmixScriptString(functionName)}", Input:="${escapeVmixScriptString(input)}", Value:="${escapeVmixScriptString(value)}")`,
+    };
+}
+
+function buildNicknameText(target) {
+    return String((target && (target.spectated_name || target.player_name || target.hero_name)) || "").trim();
+}
+
+function buildVmixNicknameCall(config, target) {
+    const vmix = config.vmix || {};
+    const nickname = vmix.nickname || {};
+    const baseUrl = String(nickname.baseUrl || vmix.baseUrl || "").trim();
+    const input = String(nickname.input || "").trim();
+    const selectedName = String(nickname.selectedName || "Nickname.Text").trim();
+    const value = buildNicknameText(target);
+
+    if (!baseUrl || !input || !selectedName || !value) {
+        throw new Error("vMix nickname config is incomplete. baseUrl, input, selectedName, and nickname value are required.");
+    }
+
+    const url = new URL(baseUrl);
+    url.searchParams.set("Function", "SetText");
+    url.searchParams.set("Input", input);
+    url.searchParams.set("SelectedName", selectedName);
+    url.searchParams.set("Value", value);
+
+    return {
+        functionName: "SetText",
+        input,
+        selectedName,
+        value,
+        url: url.toString(),
+        scriptCall: `API.Function("SetText", Input:="${escapeVmixScriptString(input)}", SelectedName:="${escapeVmixScriptString(selectedName)}", Value:="${escapeVmixScriptString(value)}")`,
     };
 }
 
@@ -116,4 +152,5 @@ module.exports = {
     findMappingForTarget,
     addAvailableUsername,
     buildVmixCall,
+    buildVmixNicknameCall,
 };

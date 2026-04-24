@@ -45,6 +45,10 @@ function hasUserConfig(config) {
     (functionName && functionName !== "SetLayer") ||
     String(vmix.input || "").trim() ||
     String(vmix.unmappedValue || "").trim() ||
+    Boolean(vmix.nickname?.enabled) ||
+    String(vmix.nickname?.baseUrl || "").trim() ||
+    String(vmix.nickname?.input || "").trim() ||
+    (String(vmix.nickname?.selectedName || "").trim() && String(vmix.nickname?.selectedName || "").trim() !== "Nickname.Text") ||
     mappings.some((row) => String(row?.username || "").trim() || String(row?.value || "").trim())
   );
 }
@@ -182,6 +186,12 @@ function readConfigForm() {
       functionName: document.getElementById("vmixFunctionName").value,
       input: document.getElementById("vmixInput").value,
       unmappedValue: document.getElementById("vmixUnmappedValue").value,
+      nickname: {
+        enabled: document.getElementById("nicknameEnabled").checked,
+        baseUrl: document.getElementById("nicknameBaseUrl").value,
+        input: document.getElementById("nicknameInput").value,
+        selectedName: document.getElementById("nicknameSelectedName").value,
+      },
       mappings: readMappingsFromForm(),
     }
   };
@@ -197,6 +207,10 @@ function writeConfigForm(config) {
   document.getElementById("vmixFunctionName").value = config.vmix?.functionName || "SetLayer";
   document.getElementById("vmixInput").value = config.vmix?.input || "";
   document.getElementById("vmixUnmappedValue").value = config.vmix?.unmappedValue || "";
+  document.getElementById("nicknameEnabled").checked = !!config.vmix?.nickname?.enabled;
+  document.getElementById("nicknameBaseUrl").value = config.vmix?.nickname?.baseUrl || "";
+  document.getElementById("nicknameInput").value = config.vmix?.nickname?.input || "";
+  document.getElementById("nicknameSelectedName").value = config.vmix?.nickname?.selectedName || "Nickname.Text";
 
   const mappings = config.vmix?.mappings || [];
   for (let i = 0; i < mappingSlots; i++) {
@@ -367,6 +381,8 @@ function renderState(state) {
   document.getElementById("status-last-unmapped").textContent = s.last_unmapped_name || "—";
   document.getElementById("status-vmix-call").textContent = s.last_vmix_script_call || "—";
   document.getElementById("status-vmix-error").textContent = s.last_vmix_error || "—";
+  document.getElementById("status-nickname-call").textContent = s.last_nickname_script_call || "—";
+  document.getElementById("status-nickname-error").textContent = s.last_nickname_error || "—";
 
   const empty = document.getElementById("current-empty");
   const panel = document.getElementById("current");
@@ -402,21 +418,27 @@ function updatePreview() {
   const functionName = config.vmix.functionName || "SetLayer";
   const input = config.vmix.input || "67";
   const mapping = findMappingForCurrent();
+  const lines = [];
 
   if (!lastCurrent) {
-    document.getElementById("preview").textContent = `API.Function("${functionName}", Input:="${input}", Value:="100")`;
-    return;
-  }
-
-  if (!mapping || !String(mapping.value || "").trim()) {
+    lines.push(`Layer: API.Function("${functionName}", Input:="${input}", Value:="100")`);
+  } else if (!mapping || !String(mapping.value || "").trim()) {
     const fallbackValue = config.vmix.unmappedValue || "";
-    document.getElementById("preview").textContent = fallbackValue
-      ? `Unmapped fallback for ${lastCurrent.spectated_name || "current target"}: API.Function("${functionName}", Input:="${input}", Value:="${fallbackValue}")`
-      : `No mapped value for ${lastCurrent.spectated_name || "current target"}; no vMix call will be sent.`;
-    return;
+    lines.push(fallbackValue
+      ? `Layer fallback for ${lastCurrent.spectated_name || "current target"}: API.Function("${functionName}", Input:="${input}", Value:="${fallbackValue}")`
+      : `Layer: no mapped value for ${lastCurrent.spectated_name || "current target"}; no layer command will be sent.`);
+  } else {
+    lines.push(`Layer: API.Function("${functionName}", Input:="${input}", Value:="${mapping.value}")`);
   }
 
-  document.getElementById("preview").textContent = `API.Function("${functionName}", Input:="${input}", Value:="${mapping.value}")`;
+  if (config.vmix.nickname?.enabled) {
+    const nicknameInput = config.vmix.nickname.input || "86";
+    const selectedName = config.vmix.nickname.selectedName || "Nickname.Text";
+    const nickname = lastCurrent?.spectated_name || "EXAMPLE";
+    lines.push(`Nickname: API.Function("SetText", Input:="${nicknameInput}", SelectedName:="${selectedName}", Value:="${nickname}")`);
+  }
+
+  document.getElementById("preview").textContent = lines.join("\n");
 }
 
 async function refresh() {
@@ -507,6 +529,8 @@ document.getElementById("clear-usernames").addEventListener("click", async () =>
       last_unmapped_name: "",
       last_vmix_script_call: "",
       last_vmix_error: null,
+      last_nickname_script_call: "",
+      last_nickname_error: null,
     };
 
     renderState(clearedState);

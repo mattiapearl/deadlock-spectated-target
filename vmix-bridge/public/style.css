@@ -32,6 +32,17 @@ label {
   margin-bottom: 12px;
 }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin-top: 0;
+}
+
 input, button {
   width: 100%;
   box-sizing: border-box;

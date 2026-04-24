@@ -9,6 +9,12 @@
     "functionName": "SetLayer",
     "input": "",
     "unmappedValue": "",
+    "nickname": {
+      "enabled": false,
+      "baseUrl": "",
+      "input": "",
+      "selectedName": "Nickname.Text"
+    },
     "mappings": [
       { "username": "", "value": "" },
       { "username": "", "value": "" },

@@ -15,6 +15,7 @@ const {
     findMappingForTarget,
     addAvailableUsername,
     buildVmixCall,
+    buildVmixNicknameCall,
 } = require("./helpers.js");
 
 const DEFAULT_PORT = 5015;
@@ -46,6 +47,12 @@ function defaultConfig() {
             functionName: "SetLayer",
             input: "",
             unmappedValue: "",
+            nickname: {
+                enabled: false,
+                baseUrl: "",
+                input: "",
+                selectedName: "Nickname.Text",
+            },
             mappings: buildDefaultMappings(),
         },
     };
@@ -64,6 +71,10 @@ function loadConfig() {
             vmix: {
                 ...defaultConfig().vmix,
                 ...(parsed.vmix || {}),
+                nickname: {
+                    ...defaultConfig().vmix.nickname,
+                    ...((parsed.vmix && parsed.vmix.nickname) || {}),
+                },
                 mappings: normalizeMappings(parsed.vmix && parsed.vmix.mappings),
             },
         };
@@ -124,6 +135,12 @@ const state = {
     last_vmix_request: "",
     last_vmix_script_call: "",
     last_vmix_error: null,
+    last_nickname_input: "",
+    last_nickname_selected_name: "",
+    last_nickname_value: "",
+    last_nickname_request: "",
+    last_nickname_script_call: "",
+    last_nickname_error: null,
 };
 
 let ablyClient = null;
@@ -151,13 +168,18 @@ function addHistory(entry) {
     if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
 }
 
-async function updateVmixValue(value) {
-    const built = buildVmixCall(config, value);
+async function sendVmixRequest(built) {
     const response = await fetch(built.url, { method: "GET" });
     if (!response.ok) {
         const body = await response.text();
         throw new Error(`vMix HTTP ${response.status}: ${body.slice(0, 300)}`);
     }
+    return built;
+}
+
+async function updateVmixValue(value) {
+    const built = buildVmixCall(config, value);
+    await sendVmixRequest(built);
 
     state.last_vmix_function = built.functionName;
     state.last_vmix_input = built.input;
@@ -165,6 +187,22 @@ async function updateVmixValue(value) {
     state.last_vmix_request = built.url;
     state.last_vmix_script_call = built.scriptCall;
     state.last_vmix_error = null;
+    return built;
+}
+
+async function updateVmixNickname(target) {
+    const nicknameConfig = config.vmix && config.vmix.nickname || {};
+    if (!nicknameConfig.enabled) return null;
+
+    const built = buildVmixNicknameCall(config, target);
+    await sendVmixRequest(built);
+
+    state.last_nickname_input = built.input;
+    state.last_nickname_selected_name = built.selectedName;
+    state.last_nickname_value = built.value;
+    state.last_nickname_request = built.url;
+    state.last_nickname_script_call = built.scriptCall;
+    state.last_nickname_error = null;
     return built;
 }
 
@@ -228,20 +266,30 @@ async function handleIncomingMessage(eventName, rawData) {
 
     broadcastSSE({ type: "target", state });
 
-    if (!hasMappedValue && !shouldSendFallback) {
-        return;
+    if (hasMappedValue || shouldSendFallback) {
+        try {
+            const valueToSend = hasMappedValue ? mapping.value : unmappedValue;
+            const built = await updateVmixValue(valueToSend);
+            const reason = hasMappedValue ? `mapped row ${mapping.rowIndex + 1}` : `unmapped fallback for ${target.spectated_name}`;
+            console.log(`[VMIX-BRIDGE] Updated vMix via ${built.functionName}: ${valueToSend} (${reason})`);
+            broadcastSSE({ type: "vmix_updated", state });
+        } catch (error) {
+            state.last_vmix_error = String(error && error.message ? error.message : error);
+            console.error("[VMIX-BRIDGE] Update failed:", state.last_vmix_error);
+            broadcastSSE({ type: "vmix_error", state });
+        }
     }
 
     try {
-        const valueToSend = hasMappedValue ? mapping.value : unmappedValue;
-        const built = await updateVmixValue(valueToSend);
-        const reason = hasMappedValue ? `mapped row ${mapping.rowIndex + 1}` : `unmapped fallback for ${target.spectated_name}`;
-        console.log(`[VMIX-BRIDGE] Updated vMix via ${built.functionName}: ${valueToSend} (${reason})`);
-        broadcastSSE({ type: "vmix_updated", state });
+        const built = await updateVmixNickname(target);
+        if (built) {
+            console.log(`[VMIX-BRIDGE] Updated vMix nickname: ${built.value}`);
+            broadcastSSE({ type: "nickname_updated", state });
+        }
     } catch (error) {
-        state.last_vmix_error = String(error && error.message ? error.message : error);
-        console.error("[VMIX-BRIDGE] Update failed:", state.last_vmix_error);
-        broadcastSSE({ type: "vmix_error", state });
+        state.last_nickname_error = String(error && error.message ? error.message : error);
+        console.error("[VMIX-BRIDGE] Nickname update failed:", state.last_nickname_error);
+        broadcastSSE({ type: "nickname_error", state });
     }
 }
 
@@ -347,6 +395,8 @@ const server = http.createServer(async (req, res) => {
             last_vmix_function: state.last_vmix_function,
             last_vmix_value: state.last_vmix_value,
             last_vmix_error: state.last_vmix_error,
+            last_nickname_value: state.last_nickname_value,
+            last_nickname_error: state.last_nickname_error,
         });
         return;
     }
@@ -373,6 +423,10 @@ const server = http.createServer(async (req, res) => {
                 config.vmix = {
                     ...config.vmix,
                     ...update.vmix,
+                    nickname: {
+                        ...(config.vmix.nickname || defaultConfig().vmix.nickname),
+                        ...(update.vmix.nickname || {}),
+                    },
                     mappings: update.vmix.mappings !== undefined
                         ? normalizeMappings(update.vmix.mappings)
                         : normalizeMappings(config.vmix.mappings),
