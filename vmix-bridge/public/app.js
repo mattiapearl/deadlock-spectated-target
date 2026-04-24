@@ -44,6 +44,7 @@ function hasUserConfig(config) {
     (baseUrl && baseUrl !== "http://127.0.0.1:8088/API") ||
     (functionName && functionName !== "SetLayer") ||
     String(vmix.input || "").trim() ||
+    String(vmix.unmappedValue || "").trim() ||
     mappings.some((row) => String(row?.username || "").trim() || String(row?.value || "").trim())
   );
 }
@@ -180,6 +181,7 @@ function readConfigForm() {
       baseUrl: document.getElementById("vmixBaseUrl").value,
       functionName: document.getElementById("vmixFunctionName").value,
       input: document.getElementById("vmixInput").value,
+      unmappedValue: document.getElementById("vmixUnmappedValue").value,
       mappings: readMappingsFromForm(),
     }
   };
@@ -194,6 +196,7 @@ function writeConfigForm(config) {
   document.getElementById("vmixBaseUrl").value = config.vmix?.baseUrl || "http://127.0.0.1:8088/API";
   document.getElementById("vmixFunctionName").value = config.vmix?.functionName || "SetLayer";
   document.getElementById("vmixInput").value = config.vmix?.input || "";
+  document.getElementById("vmixUnmappedValue").value = config.vmix?.unmappedValue || "";
 
   const mappings = config.vmix?.mappings || [];
   for (let i = 0; i < mappingSlots; i++) {
@@ -406,7 +409,10 @@ function updatePreview() {
   }
 
   if (!mapping || !String(mapping.value || "").trim()) {
-    document.getElementById("preview").textContent = `No mapped value for ${lastCurrent.spectated_name || "current target"}`;
+    const fallbackValue = config.vmix.unmappedValue || "";
+    document.getElementById("preview").textContent = fallbackValue
+      ? `Unmapped fallback for ${lastCurrent.spectated_name || "current target"}: API.Function("${functionName}", Input:="${input}", Value:="${fallbackValue}")`
+      : `No mapped value for ${lastCurrent.spectated_name || "current target"}; no vMix call will be sent.`;
     return;
   }
 

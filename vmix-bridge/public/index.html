@@ -77,13 +77,19 @@
           </label>
         </div>
 
-        <label>
-          vMix static input
-          <input id="vmixInput" type="text" placeholder="67">
-        </label>
+        <div class="row">
+          <label>
+            vMix static input
+            <input id="vmixInput" type="text" placeholder="67">
+          </label>
+          <label>
+            Unmapped fallback value
+            <input id="vmixUnmappedValue" type="text" placeholder="optional, e.g. 0 or 99">
+          </label>
+        </div>
 
         <p class="muted small">
-          vMix research note: <code>API.Function(functionName, input, value, ...)</code> maps to the HTTP Web API. The bridge sends the mapping <strong>value</strong> raw to the chosen function. For your production setup, that value can be the camera number (for example <code>100</code>). If a different input expects <code>Index,Input</code> syntax as described in the shortcut reference, enter that raw string instead.
+          vMix research note: <code>API.Function(functionName, input, value, ...)</code> maps to the HTTP Web API. The bridge sends the mapping <strong>value</strong> raw to the chosen function. For your production setup, that value can be the camera number (for example <code>100</code>). If a different input expects <code>Index,Input</code> syntax as described in the shortcut reference, enter that raw string instead. Set <strong>Unmapped fallback value</strong> to a safe camera/blank value so unmapped players do not leave vMix stuck on the previous mapped player.
         </p>
 
         <h3>Username → Value mapping table</h3>

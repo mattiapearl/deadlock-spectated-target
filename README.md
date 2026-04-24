@@ -193,6 +193,7 @@ http://localhost:5015
 - subscribes to Ably channel updates
 - keeps a live list of usernames seen in the current game
 - provides a 12-row `username -> value` mapping table with searchable username inputs and choose dropdowns
+- supports an unmapped fallback value so unmapped players do not leave vMix on the previous mapped camera
 - clears available usernames for a new game with one click
 - writes to local vMix via a configured shortcut function such as `SetLayer`
 - local UI to modify settings
@@ -216,6 +217,7 @@ Use the vMix bridge UI, or copy `vmix-bridge/config.example.json` to local-only 
     "baseUrl": "http://127.0.0.1:8088/API",
     "functionName": "SetLayer",
     "input": "67",
+    "unmappedValue": "0",
     "mappings": [
       { "username": "PlayerOne", "value": "100" },
       { "username": "PlayerTwo", "value": "101" }
@@ -243,6 +245,8 @@ http://127.0.0.1:8088/API/?Function=SetLayer&Input=67&Value=100
 ```
 
 The mapping value is sent raw. So if your production wants `100`, enter `100`. If a particular vMix input later expects something like `1,100`, enter exactly that string in the mapping table.
+
+Set `unmappedValue` / **Unmapped fallback value** to a safe blank/default camera value. When the spectated player has no mapping row, the bridge sends this fallback instead of leaving vMix stuck on the previously mapped player. Leave it blank only if you intentionally want unmapped players to send no vMix command.
 
 ## Settings persistence
 

@@ -45,6 +45,7 @@ function defaultConfig() {
             baseUrl: "http://127.0.0.1:8088/API",
             functionName: "SetLayer",
             input: "",
+            unmappedValue: "",
             mappings: buildDefaultMappings(),
         },
     };
@@ -150,8 +151,8 @@ function addHistory(entry) {
     if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
 }
 
-async function updateVmixFromMapping(mapping) {
-    const built = buildVmixCall(config, mapping.value);
+async function updateVmixValue(value) {
+    const built = buildVmixCall(config, value);
     const response = await fetch(built.url, { method: "GET" });
     if (!response.ok) {
         const body = await response.text();
@@ -197,6 +198,8 @@ async function handleIncomingMessage(eventName, rawData) {
 
     const mapping = findMappingForTarget(config.vmix.mappings, target);
     const hasMappedValue = !!(mapping && String(mapping.value || "").trim());
+    const unmappedValue = String(config.vmix.unmappedValue || "").trim();
+    const shouldSendFallback = !hasMappedValue && !!unmappedValue;
 
     if (mapping) {
         state.last_matched_mapping = {
@@ -219,18 +222,21 @@ async function handleIncomingMessage(eventName, rawData) {
         event_name: eventName,
         observed_at: new Date().toISOString(),
         mapped_row: mapping ? mapping.rowIndex + 1 : null,
-        mapped_value: hasMappedValue ? mapping.value : "",
+        mapped_value: hasMappedValue ? mapping.value : (shouldSendFallback ? unmappedValue : ""),
+        used_fallback: shouldSendFallback,
     });
 
     broadcastSSE({ type: "target", state });
 
-    if (!hasMappedValue) {
+    if (!hasMappedValue && !shouldSendFallback) {
         return;
     }
 
     try {
-        const built = await updateVmixFromMapping(mapping);
-        console.log(`[VMIX-BRIDGE] Updated vMix via ${built.functionName}: ${mapping.value}`);
+        const valueToSend = hasMappedValue ? mapping.value : unmappedValue;
+        const built = await updateVmixValue(valueToSend);
+        const reason = hasMappedValue ? `mapped row ${mapping.rowIndex + 1}` : `unmapped fallback for ${target.spectated_name}`;
+        console.log(`[VMIX-BRIDGE] Updated vMix via ${built.functionName}: ${valueToSend} (${reason})`);
         broadcastSSE({ type: "vmix_updated", state });
     } catch (error) {
         state.last_vmix_error = String(error && error.message ? error.message : error);
@@ -403,7 +409,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         try {
-            const built = await updateVmixFromMapping(mapping);
+            const built = await updateVmixValue(mapping.value);
             broadcastSSE({ type: "vmix_test", state });
             sendJson(res, 200, { status: "sent", mapping, built });
         } catch (error) {
