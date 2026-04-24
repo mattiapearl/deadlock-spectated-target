@@ -188,4 +188,5 @@ The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, sym
 - `POST /config`
 - `POST /clear-available-usernames`
 - `POST /test-vmix`
+- `POST /test-nickname`
 - `GET /stream`

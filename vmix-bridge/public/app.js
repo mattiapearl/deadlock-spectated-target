@@ -500,7 +500,20 @@ document.getElementById("config-form").addEventListener("submit", async (event) 
 document.getElementById("test-vmix").addEventListener("click", async () => {
   try {
     const result = await getJson("/test-vmix", { method: "POST" });
-    setStatus(`vMix call ok: ${result.built.scriptCall}`, false);
+    setStatus(`vMix layer call ok: ${result.built.scriptCall}`, false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+});
+
+document.getElementById("test-nickname").addEventListener("click", async () => {
+  try {
+    const result = await getJson("/test-nickname", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: lastCurrent?.spectated_name || "НУЖНЫЙ_ТЕКСТ" })
+    });
+    setStatus(`vMix nickname call ok: ${result.built.scriptCall} URL: ${result.built.url}`, false);
   } catch (error) {
     setStatus(error.message, true);
   }

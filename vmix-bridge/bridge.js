@@ -190,9 +190,9 @@ async function updateVmixValue(value) {
     return built;
 }
 
-async function updateVmixNickname(target) {
+async function updateVmixNickname(target, force = false) {
     const nicknameConfig = config.vmix && config.vmix.nickname || {};
-    if (!nicknameConfig.enabled) return null;
+    if (!force && !nicknameConfig.enabled) return null;
 
     const built = buildVmixNicknameCall(config, target);
     await sendVmixRequest(built);
@@ -473,6 +473,24 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (pathname === "/test-nickname" && req.method === "POST") {
+        try {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            const value = typeof body.value === "string"
+                ? body.value
+                : (state.current && state.current.spectated_name) || "НУЖНЫЙ_ТЕКСТ";
+            const target = normalizeTarget({ spectated_name: value, player_name: value, team: "test" });
+            const built = await updateVmixNickname(target, true);
+            broadcastSSE({ type: "nickname_test", state });
+            sendJson(res, 200, { status: "sent", built });
+        } catch (error) {
+            state.last_nickname_error = String(error && error.message ? error.message : error);
+            sendJson(res, 400, { status: "error", error: state.last_nickname_error });
+        }
+        return;
+    }
+
     if (pathname === "/stream" && req.method === "GET") {
         if (sseClients.size >= MAX_SSE_CLIENTS) {
             sendJson(res, 429, { error: "Too many stream clients" });
@@ -498,7 +516,7 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, {
         error: "Not found",
-        endpoints: ["/health", "/state", "/config", "/clear-available-usernames", "/clear-usernames", "/test-vmix", "/stream"],
+        endpoints: ["/health", "/state", "/config", "/clear-available-usernames", "/clear-usernames", "/test-vmix", "/test-nickname", "/stream"],
     });
 });
 

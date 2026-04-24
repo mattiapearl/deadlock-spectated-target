@@ -267,7 +267,7 @@ Example:
 http://127.0.0.1:8088/API/?Function=SetText&Input=86&SelectedName=Nickname.Text&Value=EXAMPLE
 ```
 
-The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, symbols, and Russian characters are safe.
+There is also a **Test nickname text** button and `POST /test-nickname` endpoint. The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, symbols, and Russian characters are safe.
 
 ## Settings persistence
 
