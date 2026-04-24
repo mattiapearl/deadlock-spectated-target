@@ -2,15 +2,21 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { applyTemplate, buildTargetKey, normalizeTarget, buildVmixUrl } = require("./helpers.js");
+const {
+    MAPPING_SLOTS,
+    buildDefaultMappings,
+    buildTargetKey,
+    normalizeTarget,
+    normalizeMappings,
+    findMappingForTarget,
+    addAvailableUsername,
+    buildVmixCall,
+} = require("./helpers.js");
 
-test("applyTemplate substitutes target fields", () => {
-    const text = applyTemplate("Now spectating: {spectated_name} [{team}]", {
-        spectated_name: "B3AN",
-        team: "amber",
-    });
-
-    assert.equal(text, "Now spectating: B3AN [amber]");
+test("buildDefaultMappings creates 12 empty rows", () => {
+    const mappings = buildDefaultMappings();
+    assert.equal(mappings.length, MAPPING_SLOTS);
+    assert.deepEqual(mappings[0], { username: "", value: "" });
 });
 
 test("buildTargetKey is stable", () => {
@@ -26,21 +32,47 @@ test("normalizeTarget falls back to available names", () => {
     assert.equal(target.team, "sapphire");
 });
 
-test("buildVmixUrl creates SetText request", () => {
-    const built = buildVmixUrl({
+test("normalizeMappings pads and normalizes rows", () => {
+    const mappings = normalizeMappings([{ username: "A", value: "100" }]);
+    assert.equal(mappings.length, MAPPING_SLOTS);
+    assert.deepEqual(mappings[0], { username: "A", value: "100" });
+    assert.deepEqual(mappings[1], { username: "", value: "" });
+});
+
+test("findMappingForTarget matches spectated name case-insensitively", () => {
+    const mapping = findMappingForTarget([
+        { username: "b3an", value: "100" },
+        { username: "Other", value: "200" },
+    ], { spectated_name: "B3AN" });
+
+    assert.deepEqual(mapping, {
+        rowIndex: 0,
+        username: "b3an",
+        value: "100",
+    });
+});
+
+test("addAvailableUsername deduplicates seen names", () => {
+    let list = addAvailableUsername([], { spectated_name: "B3AN" });
+    list = addAvailableUsername(list, { spectated_name: "b3an" });
+    list = addAvailableUsername(list, { player_name: "Other" });
+    assert.deepEqual(list, ["B3AN", "Other"]);
+});
+
+test("buildVmixCall creates SetLayer request and script syntax", () => {
+    const built = buildVmixCall({
         vmix: {
             baseUrl: "http://127.0.0.1:8088/API",
-            input: "Title1",
-            selectedName: "Headline.Text",
-            textTemplate: "{spectated_name}",
+            functionName: "SetLayer",
+            input: "67",
         },
-    }, {
-        spectated_name: "B3AN",
-    });
+    }, "100");
 
-    assert.equal(built.text, "B3AN");
-    assert.match(built.url, /Function=SetText/);
-    assert.match(built.url, /Input=Title1/);
-    assert.match(built.url, /SelectedName=Headline.Text/);
-    assert.match(built.url, /Value=B3AN/);
+    assert.equal(built.functionName, "SetLayer");
+    assert.equal(built.input, "67");
+    assert.equal(built.value, "100");
+    assert.match(built.url, /Function=SetLayer/);
+    assert.match(built.url, /Input=67/);
+    assert.match(built.url, /Value=100/);
+    assert.equal(built.scriptCall, 'API.Function("SetLayer", Input:="67", Value:="100")');
 });

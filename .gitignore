@@ -3,3 +3,7 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local settings and secrets. Use config.example.json as the template.
+relay/config.json
+vmix-bridge/config.json

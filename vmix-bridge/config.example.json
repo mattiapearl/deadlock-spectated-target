@@ -1,0 +1,26 @@
+{
+  "ably": {
+    "apiKey": "",
+    "channel": "deadlock.spectated-target",
+    "clientId": "caster-vmix-bridge"
+  },
+  "vmix": {
+    "baseUrl": "http://127.0.0.1:8088/API",
+    "functionName": "SetLayer",
+    "input": "",
+    "mappings": [
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" },
+      { "username": "", "value": "" }
+    ]
+  }
+}

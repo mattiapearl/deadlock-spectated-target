@@ -9,15 +9,18 @@
 <body>
   <main class="wrap">
     <h1>Deadlock vMix Bridge</h1>
-    <p class="muted">Caster-side bridge: subscribes to Ably and writes the current target into local vMix.</p>
+    <p class="muted">Caster-side bridge: subscribes to Ably, tracks usernames in the current game, and routes matched names to vMix using <code>SetLayer</code>-style API calls.</p>
 
     <section class="card">
       <h2>Status</h2>
       <dl class="grid">
         <dt>Ably</dt><dd id="status-ably">idle</dd>
         <dt>Received events</dt><dd id="status-count">0</dd>
+        <dt>Known usernames</dt><dd id="status-usernames">0</dd>
         <dt>Last message</dt><dd id="status-last-message">—</dd>
-        <dt>Last vMix text</dt><dd id="status-vmix-text">—</dd>
+        <dt>Last match</dt><dd id="status-last-match">—</dd>
+        <dt>Last unmapped</dt><dd id="status-last-unmapped">—</dd>
+        <dt>Last vMix call</dt><dd id="status-vmix-call">—</dd>
         <dt>Last vMix error</dt><dd id="status-vmix-error">—</dd>
       </dl>
     </section>
@@ -35,7 +38,17 @@
     </section>
 
     <section class="card">
+      <h2>Available usernames</h2>
+      <div class="actions">
+        <button type="button" id="clear-usernames">Clear current game UI</button>
+      </div>
+      <ul id="available-usernames" class="chips"></ul>
+      <datalist id="available-username-options"></datalist>
+    </section>
+
+    <section class="card">
       <h2>Settings</h2>
+      <p class="muted small">Settings are saved to local <code>vmix-bridge/config.json</code> when you click Save. The browser also keeps a localStorage recovery backup and will restore it into the form if the server config is missing or blank.</p>
       <form id="config-form">
         <div class="row">
           <label>
@@ -59,31 +72,42 @@
             <input id="vmixBaseUrl" type="text" placeholder="http://127.0.0.1:8088/API">
           </label>
           <label>
-            vMix input name or GUID
-            <input id="vmixInput" type="text" placeholder="Title1 or GUID">
+            vMix function
+            <input id="vmixFunctionName" type="text" placeholder="SetLayer">
           </label>
         </div>
 
-        <div class="row">
-          <label>
-            vMix field name
-            <input id="vmixSelectedName" type="text" placeholder="Headline.Text">
-          </label>
-          <label>
-            Text template
-            <input id="vmixTemplate" type="text" placeholder="{spectated_name}">
-          </label>
-        </div>
+        <label>
+          vMix static input
+          <input id="vmixInput" type="text" placeholder="67">
+        </label>
+
+        <p class="muted small">
+          vMix research note: <code>API.Function(functionName, input, value, ...)</code> maps to the HTTP Web API. The bridge sends the mapping <strong>value</strong> raw to the chosen function. For your production setup, that value can be the camera number (for example <code>100</code>). If a different input expects <code>Index,Input</code> syntax as described in the shortcut reference, enter that raw string instead.
+        </p>
+
+        <h3>Username → Value mapping table</h3>
+        <p class="muted small">Username cells are searchable. Type in the username box to filter observed names, use the per-row choose dropdown, or click a username chip above to fill the focused/first empty row.</p>
+        <table class="mapping-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>Value sent to vMix</th>
+            </tr>
+          </thead>
+          <tbody id="mapping-body"></tbody>
+        </table>
 
         <div class="actions">
           <button type="submit">Save and reconnect</button>
-          <button type="button" id="test-vmix">Test vMix write</button>
+          <button type="button" id="test-vmix">Test current mapping</button>
         </div>
       </form>
 
       <div class="preview">
-        <h3>Text preview</h3>
-        <pre id="preview">{spectated_name}</pre>
+        <h3>Current API preview</h3>
+        <pre id="preview">API.Function("SetLayer", Input:="67", Value:="100")</pre>
       </div>
 
       <div id="status-message" class="status muted">Idle.</div>

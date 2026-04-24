@@ -5,7 +5,17 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 const Ably = require("ably");
-const { loadJson, buildTargetKey, normalizeTarget, buildVmixUrl } = require("./helpers.js");
+const {
+    MAPPING_SLOTS,
+    loadJson,
+    buildDefaultMappings,
+    buildTargetKey,
+    normalizeTarget,
+    normalizeMappings,
+    findMappingForTarget,
+    addAvailableUsername,
+    buildVmixCall,
+} = require("./helpers.js");
 
 const DEFAULT_PORT = 5015;
 const CONFIG_PATH = path.join(__dirname, "config.json");
@@ -33,9 +43,9 @@ function defaultConfig() {
         },
         vmix: {
             baseUrl: "http://127.0.0.1:8088/API",
+            functionName: "SetLayer",
             input: "",
-            selectedName: "Headline.Text",
-            textTemplate: "{spectated_name}",
+            mappings: buildDefaultMappings(),
         },
     };
 }
@@ -53,6 +63,7 @@ function loadConfig() {
             vmix: {
                 ...defaultConfig().vmix,
                 ...(parsed.vmix || {}),
+                mappings: normalizeMappings(parsed.vmix && parsed.vmix.mappings),
             },
         };
     } catch {
@@ -100,11 +111,18 @@ const state = {
     current: null,
     currentKey: "",
     history: [],
+    available_usernames: [],
     received_count: 0,
     last_message_at: null,
-    last_vmix_text: "",
-    last_vmix_error: null,
     last_event_name: "",
+    last_matched_mapping: null,
+    last_unmapped_name: "",
+    last_vmix_function: "",
+    last_vmix_input: "",
+    last_vmix_value: "",
+    last_vmix_request: "",
+    last_vmix_script_call: "",
+    last_vmix_error: null,
 };
 
 let ablyClient = null;
@@ -132,17 +150,33 @@ function addHistory(entry) {
     if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
 }
 
-async function updateVmix(target) {
-    const built = buildVmixUrl(config, target);
+async function updateVmixFromMapping(mapping) {
+    const built = buildVmixCall(config, mapping.value);
     const response = await fetch(built.url, { method: "GET" });
     if (!response.ok) {
         const body = await response.text();
         throw new Error(`vMix HTTP ${response.status}: ${body.slice(0, 300)}`);
     }
 
-    state.last_vmix_text = built.text;
+    state.last_vmix_function = built.functionName;
+    state.last_vmix_input = built.input;
+    state.last_vmix_value = built.value;
+    state.last_vmix_request = built.url;
+    state.last_vmix_script_call = built.scriptCall;
     state.last_vmix_error = null;
-    return built.text;
+    return built;
+}
+
+function resetGameState() {
+    state.current = null;
+    state.currentKey = "";
+    state.history = [];
+    state.available_usernames = [];
+    state.received_count = 0;
+    state.last_message_at = null;
+    state.last_event_name = "";
+    state.last_matched_mapping = null;
+    state.last_unmapped_name = "";
 }
 
 async function handleIncomingMessage(eventName, rawData) {
@@ -150,6 +184,7 @@ async function handleIncomingMessage(eventName, rawData) {
     state.received_count++;
     state.last_message_at = new Date().toISOString();
     state.last_event_name = eventName;
+    state.available_usernames = addAvailableUsername(state.available_usernames, target);
 
     const key = buildTargetKey(target);
     if (key === state.currentKey) {
@@ -160,18 +195,42 @@ async function handleIncomingMessage(eventName, rawData) {
     state.current = target;
     state.currentKey = key;
 
-    const historyEntry = {
+    const mapping = findMappingForTarget(config.vmix.mappings, target);
+    const hasMappedValue = !!(mapping && String(mapping.value || "").trim());
+
+    if (mapping) {
+        state.last_matched_mapping = {
+            rowIndex: mapping.rowIndex,
+            username: mapping.username,
+            value: mapping.value,
+        };
+    } else {
+        state.last_matched_mapping = null;
+    }
+
+    if (!hasMappedValue) {
+        state.last_unmapped_name = target.spectated_name;
+    } else {
+        state.last_unmapped_name = "";
+    }
+
+    addHistory({
         ...target,
         event_name: eventName,
         observed_at: new Date().toISOString(),
-    };
+        mapped_row: mapping ? mapping.rowIndex + 1 : null,
+        mapped_value: hasMappedValue ? mapping.value : "",
+    });
 
-    addHistory(historyEntry);
     broadcastSSE({ type: "target", state });
 
+    if (!hasMappedValue) {
+        return;
+    }
+
     try {
-        const text = await updateVmix(target);
-        console.log(`[VMIX-BRIDGE] Updated vMix: ${text}`);
+        const built = await updateVmixFromMapping(mapping);
+        console.log(`[VMIX-BRIDGE] Updated vMix via ${built.functionName}: ${mapping.value}`);
         broadcastSSE({ type: "vmix_updated", state });
     } catch (error) {
         state.last_vmix_error = String(error && error.message ? error.message : error);
@@ -275,17 +334,19 @@ const server = http.createServer(async (req, res) => {
             connection_status: state.connection_status,
             current: state.current,
             received_count: state.received_count,
+            available_usernames: state.available_usernames,
             last_message_at: state.last_message_at,
-            last_vmix_text: state.last_vmix_text,
+            last_matched_mapping: state.last_matched_mapping,
+            last_unmapped_name: state.last_unmapped_name,
+            last_vmix_function: state.last_vmix_function,
+            last_vmix_value: state.last_vmix_value,
             last_vmix_error: state.last_vmix_error,
         });
         return;
     }
 
     if (pathname === "/state" && req.method === "GET") {
-        sendJson(res, 200, {
-            state,
-        });
+        sendJson(res, 200, { state });
         return;
     }
 
@@ -303,7 +364,15 @@ const server = http.createServer(async (req, res) => {
                 config.ably = { ...config.ably, ...update.ably };
             }
             if (update.vmix && typeof update.vmix === "object") {
-                config.vmix = { ...config.vmix, ...update.vmix };
+                config.vmix = {
+                    ...config.vmix,
+                    ...update.vmix,
+                    mappings: update.vmix.mappings !== undefined
+                        ? normalizeMappings(update.vmix.mappings)
+                        : normalizeMappings(config.vmix.mappings),
+                };
+            } else {
+                config.vmix.mappings = normalizeMappings(config.vmix.mappings);
             }
 
             saveConfig(config);
@@ -316,22 +385,30 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if ((pathname === "/clear-available-usernames" || pathname === "/clear-usernames") && req.method === "POST") {
+        resetGameState();
+        broadcastSSE({ type: "cleared_usernames", state });
+        sendJson(res, 200, { status: "cleared", state });
+        return;
+    }
+
     if (pathname === "/test-vmix" && req.method === "POST") {
-        const sample = state.current || {
-            spectated_name: "SampleTarget",
-            player_name: "SampleTarget",
-            hero_name: "",
-            team: "amber",
-            timestamp: new Date().toISOString(),
-        };
+        const target = state.current || normalizeTarget({ spectated_name: "SampleTarget", team: "amber" });
+        const mapping = findMappingForTarget(config.vmix.mappings, target);
+        const hasMappedValue = !!(mapping && String(mapping.value || "").trim());
+
+        if (!hasMappedValue) {
+            sendJson(res, 400, { error: `No mapped value found for ${target.spectated_name}` });
+            return;
+        }
 
         try {
-            const text = await updateVmix(sample);
-            broadcastSSE({ type: "vmix_test", text, state });
-            sendJson(res, 200, { status: "sent", text, sample });
+            const built = await updateVmixFromMapping(mapping);
+            broadcastSSE({ type: "vmix_test", state });
+            sendJson(res, 200, { status: "sent", mapping, built });
         } catch (error) {
             state.last_vmix_error = String(error && error.message ? error.message : error);
-            sendJson(res, 400, { status: "error", error: state.last_vmix_error, sample });
+            sendJson(res, 400, { status: "error", error: state.last_vmix_error });
         }
         return;
     }
@@ -350,7 +427,7 @@ const server = http.createServer(async (req, res) => {
         });
 
         sseClients.add(res);
-        res.write(`data: ${JSON.stringify({ type: "hello", config, state })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: "hello", config, state, mappingSlots: MAPPING_SLOTS })}\n\n`);
         req.on("close", () => sseClients.delete(res));
         return;
     }
@@ -361,7 +438,7 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, {
         error: "Not found",
-        endpoints: ["/health", "/state", "/config", "/test-vmix", "/stream"],
+        endpoints: ["/health", "/state", "/config", "/clear-available-usernames", "/clear-usernames", "/test-vmix", "/stream"],
     });
 });
 

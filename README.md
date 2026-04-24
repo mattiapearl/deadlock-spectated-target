@@ -4,7 +4,7 @@ Minimal Deadlock spectator pipeline for one job only:
 - detect who is currently being spectated in Deadlock
 - relay that value
 - optionally forward it to Ably or another HTTP destination
-- let the caster's vMix machine receive and render that text
+- let the caster's vMix machine receive that target and drive vMix
 
 ## Project structure
 
@@ -21,7 +21,8 @@ relay/
   server.js
   parser.js
   parser.test.js
-  config.json
+  config.example.json
+  config.json         # local only, ignored by git after first save/copy
   public/
     index.html
     app.js
@@ -30,7 +31,8 @@ vmix-bridge/
   bridge.js
   helpers.js
   helpers.test.js
-  config.json
+  config.example.json
+  config.json         # local only, ignored by git after first save/copy
   README.md
   public/
     index.html
@@ -148,7 +150,7 @@ The caster bridge subscribes from Ably.
 
 ### Observer relay Ably config
 
-In the relay UI or `relay/config.json`:
+Use the relay UI, or copy `relay/config.example.json` to local-only `relay/config.json` and edit it:
 
 ```json
 {
@@ -169,7 +171,7 @@ In the relay UI or `relay/config.json`:
 
 ## 4. vMix bridge (caster PC)
 
-The vMix bridge subscribes to Ably, exposes a small local UI, and writes the current target into local vMix.
+The vMix bridge subscribes to Ably, exposes a small local UI, tracks usernames seen in the current game, and routes matched usernames into local vMix using a raw `SetLayer`-style shortcut call.
 
 ### Install and run
 
@@ -183,22 +185,25 @@ npm start
 Open:
 
 ```text
-http://localhost:5011
+http://localhost:5015
 ```
 
 ### Bridge features
 
 - subscribes to Ably channel updates
-- writes to local vMix via `SetText`
+- keeps a live list of usernames seen in the current game
+- provides a 12-row `username -> value` mapping table with searchable username inputs and choose dropdowns
+- clears available usernames for a new game with one click
+- writes to local vMix via a configured shortcut function such as `SetLayer`
 - local UI to modify settings
 - shows connection status
 - shows incoming events and history
-- previews output text
-- has a manual `Test vMix write` action
+- previews the exact `API.Function(...)` style call
+- has a manual `Test current mapping` action
 
 ### Caster config
 
-In `vmix-bridge/config.json`:
+Use the vMix bridge UI, or copy `vmix-bridge/config.example.json` to local-only `vmix-bridge/config.json` and edit it:
 
 ```json
 {
@@ -209,24 +214,41 @@ In `vmix-bridge/config.json`:
   },
   "vmix": {
     "baseUrl": "http://127.0.0.1:8088/API",
-    "input": "YOUR_TITLE_INPUT_NAME_OR_GUID",
-    "selectedName": "Headline.Text",
-    "textTemplate": "{spectated_name}"
+    "functionName": "SetLayer",
+    "input": "67",
+    "mappings": [
+      { "username": "PlayerOne", "value": "100" },
+      { "username": "PlayerTwo", "value": "101" }
+    ]
   }
 }
 ```
 
 ### vMix notes
 
+Verified from the vMix docs:
+- `API.Function(functionName, input, value, ...)` maps to the HTTP Web API shortcut function call
+- the shortcut reference documents `SetLayer` as a shortcut function that changes a layer in an input according to `Value`
+
 The bridge calls:
 
 ```text
-http://127.0.0.1:8088/API/?Function=SetText&Input=<input>&SelectedName=<field>&Value=<text>
+http://127.0.0.1:8088/API/?Function=<functionName>&Input=<staticInput>&Value=<mappedValue>
 ```
 
-For GT titles, `selectedName` usually ends in `.Text`, for example:
-- `Headline.Text`
-- `PlayerName.Text`
+Production-specific example:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetLayer&Input=67&Value=100
+```
+
+The mapping value is sent raw. So if your production wants `100`, enter `100`. If a particular vMix input later expects something like `1,100`, enter exactly that string in the mapping table.
+
+## Settings persistence
+
+- `relay/config.json` and `vmix-bridge/config.json` are now local-only and ignored by git so pulls/commits do not wipe production settings.
+- Use `config.example.json` as the committed template.
+- The vMix bridge UI also keeps a best-effort browser `localStorage` backup of the config form. If `config.json` is missing or blank, the UI restores the browser backup into the form and tells you to click **Save and reconnect** to write it back.
 
 ## End-to-end flow
 
@@ -234,10 +256,11 @@ For GT titles, `selectedName` usually ends in `.Text`, for example:
 2. Addon emits `[SPEC_Target]...`
 3. Relay parses and publishes to Ably
 4. Caster bridge receives the update
-5. Caster bridge updates local vMix text field
+5. Caster bridge matches the current username to a configured value
+6. Caster bridge calls local vMix with that mapped value
 
 ## Notes
 
 - Hero name is currently empty in live testing; player name is the primary signal.
 - The relay only forwards **new** target changes unless started with `--replay`.
-- Do not commit real Ably keys. Keep committed config files blank/default and fill secrets locally.
+- Do not commit real Ably keys. Keep local `config.json` files private; committed `config.example.json` files stay blank/default.

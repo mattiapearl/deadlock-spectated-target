@@ -21,3 +21,14 @@
   - developer = Ably account/app owner
   - observer = publishes spectated target changes
   - caster = subscribes on the vMix PC and writes to local vMix API
+- vMix bridge behavior changed from direct text writes to raw shortcut-function routing.
+- vMix docs confirmed:
+  - `API.Function(functionName, input, value, ...)` maps directly to the HTTP Web API shortcut call.
+  - `SetLayer` is a shortcut function documented in the shortcut reference.
+- Because production has a validated pattern like `API.Function("SetLayer", Input:="67", Value:="100")`, the bridge sends the mapping value raw and does not transform it.
+- The caster workflow now centers on:
+  - tracking available usernames in the current game
+  - maintaining a 12-row username-to-value table
+  - clearing available usernames when a new game starts
+- Local runtime settings now live in ignored `config.json` files with committed `config.example.json` templates to avoid wiping real setups during code updates.
+- The vMix bridge UI keeps a browser localStorage backup of its config form and restores it if the server-side config is missing or blank.
