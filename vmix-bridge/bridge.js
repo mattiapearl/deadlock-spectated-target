@@ -15,7 +15,9 @@ const {
     findMappingForTarget,
     addAvailableUsername,
     buildVmixCall,
+    buildVmixTextCall,
     buildVmixNicknameCall,
+    buildVmixRosterCalls,
 } = require("./helpers.js");
 
 const DEFAULT_PORT = 5015;
@@ -53,6 +55,13 @@ function defaultConfig() {
                 input: "",
                 selectedName: "Nickname.Text",
             },
+            roster: {
+                baseUrl: "",
+                sapphireInput: "",
+                amberInput: "",
+                selectedNameTemplate: "Player{index}.Text",
+                maxPlayers: 6,
+            },
             mappings: buildDefaultMappings(),
         },
     };
@@ -74,6 +83,10 @@ function loadConfig() {
                 nickname: {
                     ...defaultConfig().vmix.nickname,
                     ...((parsed.vmix && parsed.vmix.nickname) || {}),
+                },
+                roster: {
+                    ...defaultConfig().vmix.roster,
+                    ...((parsed.vmix && parsed.vmix.roster) || {}),
                 },
                 mappings: normalizeMappings(parsed.vmix && parsed.vmix.mappings),
             },
@@ -124,6 +137,10 @@ const state = {
     currentKey: "",
     history: [],
     available_usernames: [],
+    team_rosters: {
+        sapphire: [],
+        amber: [],
+    },
     received_count: 0,
     last_message_at: null,
     last_event_name: "",
@@ -141,6 +158,9 @@ const state = {
     last_nickname_request: "",
     last_nickname_script_call: "",
     last_nickname_error: null,
+    last_roster_count: 0,
+    last_roster_request: "",
+    last_roster_error: null,
 };
 
 let ablyClient = null;
@@ -168,6 +188,21 @@ function addHistory(entry) {
     if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
 }
 
+function addTeamRosterName(target) {
+    const team = String(target && target.team || "").trim().toLowerCase();
+    if (team !== "sapphire" && team !== "amber") return false;
+
+    const candidate = String((target && (target.player_name || target.spectated_name || target.hero_name)) || "").trim();
+    if (!candidate) return false;
+
+    const list = state.team_rosters[team] || [];
+    const already = list.some((name) => String(name).trim().toLowerCase() === candidate.toLowerCase());
+    if (already) return false;
+
+    state.team_rosters[team] = list.concat(candidate).slice(0, 6);
+    return true;
+}
+
 async function sendVmixRequest(built) {
     const response = await fetch(built.url, { method: "GET" });
     if (!response.ok) {
@@ -187,6 +222,38 @@ async function updateVmixValue(value) {
     state.last_vmix_request = built.url;
     state.last_vmix_script_call = built.scriptCall;
     state.last_vmix_error = null;
+    return built;
+}
+
+async function updateVmixRoster() {
+    const calls = buildVmixRosterCalls(config, state.team_rosters);
+    for (const call of calls) {
+        await sendVmixRequest(call);
+    }
+
+    state.last_roster_count = calls.length;
+    state.last_roster_request = calls.length ? calls[calls.length - 1].url : "";
+    state.last_roster_error = null;
+    return calls;
+}
+
+async function updateRowNickname({ username, input, baseUrl, selectedName }) {
+    const value = String(username || "").trim();
+    const targetInput = String(input || "").trim();
+    const nicknameConfig = config.vmix && config.vmix.nickname || {};
+    const built = buildVmixTextCall(
+        baseUrl || nicknameConfig.baseUrl || config.vmix.baseUrl,
+        targetInput,
+        selectedName || nicknameConfig.selectedName || "Nickname.Text",
+        value
+    );
+    await sendVmixRequest(built);
+    state.last_nickname_input = built.input;
+    state.last_nickname_selected_name = built.selectedName;
+    state.last_nickname_value = built.value;
+    state.last_nickname_request = built.url;
+    state.last_nickname_script_call = built.scriptCall;
+    state.last_nickname_error = null;
     return built;
 }
 
@@ -211,6 +278,7 @@ function resetGameState() {
     state.currentKey = "";
     state.history = [];
     state.available_usernames = [];
+    state.team_rosters = { sapphire: [], amber: [] };
     state.received_count = 0;
     state.last_message_at = null;
     state.last_event_name = "";
@@ -224,6 +292,7 @@ async function handleIncomingMessage(eventName, rawData) {
     state.last_message_at = new Date().toISOString();
     state.last_event_name = eventName;
     state.available_usernames = addAvailableUsername(state.available_usernames, target);
+    const rosterChanged = addTeamRosterName(target);
 
     const key = buildTargetKey(target);
     if (key === state.currentKey) {
@@ -290,6 +359,10 @@ async function handleIncomingMessage(eventName, rawData) {
         state.last_nickname_error = String(error && error.message ? error.message : error);
         console.error("[VMIX-BRIDGE] Nickname update failed:", state.last_nickname_error);
         broadcastSSE({ type: "nickname_error", state });
+    }
+
+    if (rosterChanged) {
+        broadcastSSE({ type: "roster_changed", state });
     }
 }
 
@@ -427,6 +500,10 @@ const server = http.createServer(async (req, res) => {
                         ...(config.vmix.nickname || defaultConfig().vmix.nickname),
                         ...(update.vmix.nickname || {}),
                     },
+                    roster: {
+                        ...(config.vmix.roster || defaultConfig().vmix.roster),
+                        ...(update.vmix.roster || {}),
+                    },
                     mappings: update.vmix.mappings !== undefined
                         ? normalizeMappings(update.vmix.mappings)
                         : normalizeMappings(config.vmix.mappings),
@@ -469,6 +546,44 @@ const server = http.createServer(async (req, res) => {
         } catch (error) {
             state.last_vmix_error = String(error && error.message ? error.message : error);
             sendJson(res, 400, { status: "error", error: state.last_vmix_error });
+        }
+        return;
+    }
+
+    if (pathname === "/send-row-nickname" && req.method === "POST") {
+        try {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            const built = await updateRowNickname(body);
+            broadcastSSE({ type: "row_nickname_sent", state });
+            sendJson(res, 200, { status: "sent", built });
+        } catch (error) {
+            state.last_nickname_error = String(error && error.message ? error.message : error);
+            sendJson(res, 400, { status: "error", error: state.last_nickname_error });
+        }
+        return;
+    }
+
+    if (pathname === "/send-row-nicknames" && req.method === "POST") {
+        try {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            const rows = Array.isArray(body.rows) ? body.rows : [];
+            const sent = [];
+            for (const row of rows) {
+                if (!String(row && row.username || "").trim() || !String(row && row.input || "").trim()) continue;
+                sent.push(await updateRowNickname({
+                    username: row.username,
+                    input: row.input,
+                    baseUrl: body.baseUrl,
+                    selectedName: body.selectedName,
+                }));
+            }
+            broadcastSSE({ type: "row_nicknames_sent", state });
+            sendJson(res, 200, { status: "sent", count: sent.length, sent });
+        } catch (error) {
+            state.last_nickname_error = String(error && error.message ? error.message : error);
+            sendJson(res, 400, { status: "error", error: state.last_nickname_error });
         }
         return;
     }
@@ -516,7 +631,7 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, {
         error: "Not found",
-        endpoints: ["/health", "/state", "/config", "/clear-available-usernames", "/clear-usernames", "/test-vmix", "/test-nickname", "/stream"],
+        endpoints: ["/health", "/state", "/config", "/clear-available-usernames", "/clear-usernames", "/test-vmix", "/test-nickname", "/send-row-nickname", "/send-row-nicknames", "/stream"],
     });
 });
 

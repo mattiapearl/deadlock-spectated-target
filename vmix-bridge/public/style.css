@@ -158,6 +158,14 @@ select {
   font-weight: 600;
 }
 
+.mapping-table tr.team-sapphire td {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.mapping-table tr.team-amber td {
+  background: rgba(245, 158, 11, 0.20);
+}
+
 .mapping-table input {
   margin-top: 0;
 }

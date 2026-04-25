@@ -12,12 +12,13 @@ const {
     addAvailableUsername,
     buildVmixCall,
     buildVmixNicknameCall,
+    buildVmixRosterCalls,
 } = require("./helpers.js");
 
 test("buildDefaultMappings creates 12 empty rows", () => {
     const mappings = buildDefaultMappings();
     assert.equal(mappings.length, MAPPING_SLOTS);
-    assert.deepEqual(mappings[0], { username: "", value: "" });
+    assert.deepEqual(mappings[0], { username: "", value: "", nicknameInput: "" });
 });
 
 test("buildTargetKey is stable", () => {
@@ -34,10 +35,10 @@ test("normalizeTarget falls back to available names", () => {
 });
 
 test("normalizeMappings pads and normalizes rows", () => {
-    const mappings = normalizeMappings([{ username: "A", value: "100" }]);
+    const mappings = normalizeMappings([{ username: "A", value: "100", nicknameInput: "86" }]);
     assert.equal(mappings.length, MAPPING_SLOTS);
-    assert.deepEqual(mappings[0], { username: "A", value: "100" });
-    assert.deepEqual(mappings[1], { username: "", value: "" });
+    assert.deepEqual(mappings[0], { username: "A", value: "100", nicknameInput: "86" });
+    assert.deepEqual(mappings[1], { username: "", value: "", nicknameInput: "" });
 });
 
 test("findMappingForTarget matches spectated name case-insensitively", () => {
@@ -50,6 +51,7 @@ test("findMappingForTarget matches spectated name case-insensitively", () => {
         rowIndex: 0,
         username: "b3an",
         value: "100",
+        nicknameInput: "",
     });
 });
 
@@ -80,6 +82,32 @@ test("buildVmixNicknameCall creates encoded SetText request for unicode nickname
     assert.match(built.url, /SelectedName=Nickname\.Text/);
     assert.equal(new URL(built.url).searchParams.get("Value"), "филяй филяй & \"quoted\"");
     assert.equal(built.scriptCall, 'API.Function("SetText", Input:="86", SelectedName:="Nickname.Text", Value:="филяй филяй & ""quoted""")');
+});
+
+test("buildVmixRosterCalls creates team split SetText calls and clears empty slots", () => {
+    const calls = buildVmixRosterCalls({
+        vmix: {
+            baseUrl: "http://127.0.0.1:8088/API",
+            roster: {
+                sapphireInput: "90",
+                amberInput: "91",
+                selectedNameTemplate: "Player{index}.Text",
+                maxPlayers: 2,
+            },
+        },
+    }, {
+        sapphire: ["Сапфир One"],
+        amber: ["Amber One", "Amber Two"],
+    });
+
+    assert.equal(calls.length, 4);
+    assert.equal(calls[0].input, "90");
+    assert.equal(calls[0].selectedName, "Player1.Text");
+    assert.equal(calls[0].value, "Сапфир One");
+    assert.equal(new URL(calls[0].url).searchParams.get("Value"), "Сапфир One");
+    assert.equal(calls[1].value, "");
+    assert.equal(calls[2].input, "91");
+    assert.equal(calls[3].value, "Amber Two");
 });
 
 test("buildVmixCall creates SetLayer request and script syntax", () => {

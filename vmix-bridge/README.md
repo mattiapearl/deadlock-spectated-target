@@ -44,9 +44,11 @@ So the bridge sends the configured mapping **value** raw to vMix, unchanged. Tha
 
 - subscribes to Ably updates
 - keeps a live list of **available usernames** seen in the current game
-- provides a **12-row mapping table** for `username -> raw vMix value`
+- provides a **12-row mapping table** for `username -> raw vMix value -> nickname input`
+- colors mapping rows by known Sapphire/Amber team
 - supports an **unmapped fallback value** so unmapped players do not leave vMix on the previous mapped camera
-- optionally sends a second `SetText` nickname call to a separate vMix input/field
+- optionally sends a second live `SetText` nickname call to a separate vMix input/field
+- sends per-row nickname `SetText` calls to configured input numbers when rows are edited, with a resend-all button
 - lets the caster **clear available usernames** when a new game starts
 - sends mapped values to vMix using the configured function and static input
 - shows incoming events and current routing state in a local UI
@@ -90,8 +92,8 @@ Use the local UI, or copy `config.example.json` to local-only `config.json` and 
       "selectedName": "Nickname.Text"
     },
     "mappings": [
-      { "username": "PlayerOne", "value": "100" },
-      { "username": "PlayerTwo", "value": "101" }
+      { "username": "PlayerOne", "value": "100", "nicknameInput": "86" },
+      { "username": "PlayerTwo", "value": "101", "nicknameInput": "87" }
     ]
   }
 }
@@ -116,9 +118,10 @@ http://localhost:5015
 The local UI lets the caster:
 - modify Ably settings
 - modify vMix settings
-- edit the 12-row username/value mapping table with searchable username inputs and per-row choose dropdowns
+- edit the 12-row username/value/nickname-input mapping table with searchable username inputs and per-row choose dropdowns
 - set an unmapped fallback value for players without mapping rows
-- enable a second nickname `SetText` call for a separate input/field
+- enable a second live nickname `SetText` call for a separate input/field
+- configure per-row nickname inputs and send them individually on edit or all at once with a button
 - see connection status
 - view incoming events/history
 - view the available usernames in the current game
@@ -170,6 +173,27 @@ http://127.0.0.1:8088/API/?Function=SetText&Input=86&SelectedName=Nickname.Text&
 ```
 
 The nickname value is URL-encoded with `URLSearchParams`, so spaces, quotes, symbols, and Russian characters are safe.
+
+## Per-row nickname inputs
+
+Each mapping row has a **Nickname input** column. If a row has both a username and nickname input, the UI sends this call after row edits settle:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=<rowNicknameInput>&SelectedName=Nickname.Text&Value=<rowUsername>
+```
+
+Example:
+
+```text
+http://127.0.0.1:8088/API/?Function=SetText&Input=86&SelectedName=Nickname.Text&Value=EXAMPLE
+```
+
+Rows are colored by the known team of the selected username:
+
+- sapphire row background for Sapphire players
+- amber row background for Amber players
+
+Use **Send all row nicknames** to resend every row with both a username and nickname input.
 
 ## Example flow
 

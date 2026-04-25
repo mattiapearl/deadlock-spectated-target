@@ -9,7 +9,9 @@ let lastCurrent = null;
 let mappingSlots = DEFAULT_MAPPING_SLOTS;
 let backupTimer = null;
 let availableUsernames = [];
+let usernameTeams = new Map();
 let activeMappingRowIndex = null;
+const rowNicknameTimers = new Map();
 
 async function getJson(url, options) {
   const res = await fetch(url, options);
@@ -49,7 +51,7 @@ function hasUserConfig(config) {
     String(vmix.nickname?.baseUrl || "").trim() ||
     String(vmix.nickname?.input || "").trim() ||
     (String(vmix.nickname?.selectedName || "").trim() && String(vmix.nickname?.selectedName || "").trim() !== "Nickname.Text") ||
-    mappings.some((row) => String(row?.username || "").trim() || String(row?.value || "").trim())
+    mappings.some((row) => String(row?.username || "").trim() || String(row?.value || "").trim() || String(row?.nicknameInput || "").trim())
   );
 }
 
@@ -127,7 +129,8 @@ function ensureMappingRows(count = DEFAULT_MAPPING_SLOTS) {
           <select id="mapping-username-choice-${i}" class="mapping-username-choice" aria-label="Choose username for row ${i + 1}"></select>
         </div>
       </td>
-      <td><input id="mapping-value-${i}" placeholder="100"></td>
+      <td><input id="mapping-value-${i}" placeholder="2,57"></td>
+      <td><input id="mapping-nickname-input-${i}" placeholder="86"></td>
     `;
     body.appendChild(row);
   }
@@ -136,15 +139,22 @@ function ensureMappingRows(count = DEFAULT_MAPPING_SLOTS) {
     const usernameInput = document.getElementById(`mapping-username-${i}`);
     const usernameChoice = document.getElementById(`mapping-username-choice-${i}`);
     const valueInput = document.getElementById(`mapping-value-${i}`);
+    const nicknameInput = document.getElementById(`mapping-nickname-input-${i}`);
 
     usernameInput.addEventListener("focus", () => {
       activeMappingRowIndex = i;
       renderUsernameChoiceControls();
     });
-    usernameInput.addEventListener("input", markConfigDirty);
+    usernameInput.addEventListener("input", () => {
+      markConfigDirty();
+      updateMappingRowTeam(i);
+      scheduleRowNicknameSend(i);
+    });
     usernameInput.addEventListener("change", () => {
       syncUsernameChoice(i);
       markConfigDirty();
+      updateMappingRowTeam(i);
+      scheduleRowNicknameSend(i);
     });
 
     usernameChoice.addEventListener("focus", renderUsernameChoiceControls);
@@ -153,11 +163,28 @@ function ensureMappingRows(count = DEFAULT_MAPPING_SLOTS) {
       if (!usernameChoice.value) return;
       activeMappingRowIndex = i;
       setMappingUsername(i, usernameChoice.value);
+      scheduleRowNicknameSend(i);
     });
 
     valueInput.addEventListener("focus", () => activeMappingRowIndex = i);
-    valueInput.addEventListener("input", markConfigDirty);
-    valueInput.addEventListener("change", markConfigDirty);
+    valueInput.addEventListener("input", () => {
+      markConfigDirty();
+      scheduleRowNicknameSend(i);
+    });
+    valueInput.addEventListener("change", () => {
+      markConfigDirty();
+      scheduleRowNicknameSend(i);
+    });
+
+    nicknameInput.addEventListener("focus", () => activeMappingRowIndex = i);
+    nicknameInput.addEventListener("input", () => {
+      markConfigDirty();
+      scheduleRowNicknameSend(i);
+    });
+    nicknameInput.addEventListener("change", () => {
+      markConfigDirty();
+      scheduleRowNicknameSend(i);
+    });
   }
 
   renderUsernameChoiceControls();
@@ -169,6 +196,7 @@ function readMappingsFromForm() {
     mappings.push({
       username: document.getElementById(`mapping-username-${i}`).value,
       value: document.getElementById(`mapping-value-${i}`).value,
+      nicknameInput: document.getElementById(`mapping-nickname-input-${i}`).value,
     });
   }
   return mappings;
@@ -216,6 +244,8 @@ function writeConfigForm(config) {
   for (let i = 0; i < mappingSlots; i++) {
     document.getElementById(`mapping-username-${i}`).value = mappings[i]?.username || "";
     document.getElementById(`mapping-value-${i}`).value = mappings[i]?.value || "";
+    document.getElementById(`mapping-nickname-input-${i}`).value = mappings[i]?.nicknameInput || "";
+    updateMappingRowTeam(i);
   }
 
   renderUsernameChoiceControls();
@@ -276,6 +306,25 @@ function renderUsernameChoiceControls() {
   }
 }
 
+function getTeamForUsername(username) {
+  return usernameTeams.get(normalizeName(username)) || "";
+}
+
+function updateMappingRowTeam(rowIndex) {
+  const input = document.getElementById(`mapping-username-${rowIndex}`);
+  const row = input && input.closest("tr");
+  if (!row) return;
+
+  row.classList.remove("team-sapphire", "team-amber");
+  const team = getTeamForUsername(input.value);
+  if (team === "sapphire") row.classList.add("team-sapphire");
+  if (team === "amber") row.classList.add("team-amber");
+}
+
+function updateAllMappingRowTeams() {
+  for (let i = 0; i < mappingSlots; i++) updateMappingRowTeam(i);
+}
+
 function setMappingUsername(rowIndex, username) {
   const input = document.getElementById(`mapping-username-${rowIndex}`);
   if (!input) return;
@@ -283,6 +332,8 @@ function setMappingUsername(rowIndex, username) {
   input.value = username;
   syncUsernameChoice(rowIndex);
   markConfigDirty();
+  updateMappingRowTeam(rowIndex);
+  scheduleRowNicknameSend(rowIndex);
   input.focus();
 }
 
@@ -302,19 +353,31 @@ function fillActiveOrFirstEmptyMapping(username) {
   setMappingUsername(rowIndex, username);
 }
 
+function rememberUsernameTeam(name, team) {
+  const cleanName = String(name || "").trim();
+  const cleanTeam = String(team || "").trim().toLowerCase();
+  if (!cleanName || (cleanTeam !== "sapphire" && cleanTeam !== "amber")) return;
+  usernameTeams.set(normalizeName(cleanName), cleanTeam);
+}
+
 function collectUsernamesFromState(state) {
   const names = [];
+  usernameTeams = new Map();
 
   for (const name of state?.available_usernames || []) names.push(name);
 
   if (state?.current) {
     names.push(state.current.spectated_name);
     names.push(state.current.player_name);
+    rememberUsernameTeam(state.current.spectated_name, state.current.team);
+    rememberUsernameTeam(state.current.player_name, state.current.team);
   }
 
   for (const item of state?.history || []) {
     names.push(item.spectated_name);
     names.push(item.player_name);
+    rememberUsernameTeam(item.spectated_name, item.team);
+    rememberUsernameTeam(item.player_name, item.team);
   }
 
   return Array.from(new Set(names
@@ -400,6 +463,7 @@ function renderState(state) {
   }
 
   renderAvailableUsernames(observedUsernames);
+  updateAllMappingRowTeams();
 
   const list = document.getElementById("history");
   list.innerHTML = "";
@@ -411,6 +475,54 @@ function renderState(state) {
   }
 
   updatePreview();
+}
+
+function readRowNicknamePayload(rowIndex) {
+  const username = document.getElementById(`mapping-username-${rowIndex}`)?.value || "";
+  const input = document.getElementById(`mapping-nickname-input-${rowIndex}`)?.value || "";
+  return {
+    username,
+    input,
+    baseUrl: document.getElementById("nicknameBaseUrl").value || document.getElementById("vmixBaseUrl").value,
+    selectedName: document.getElementById("nicknameSelectedName").value || "Nickname.Text",
+  };
+}
+
+function scheduleRowNicknameSend(rowIndex) {
+  if (suppressDirty) return;
+  clearTimeout(rowNicknameTimers.get(rowIndex));
+  rowNicknameTimers.set(rowIndex, setTimeout(async () => {
+    const payload = readRowNicknamePayload(rowIndex);
+    if (!String(payload.username || "").trim() || !String(payload.input || "").trim()) return;
+
+    try {
+      const result = await getJson("/send-row-nickname", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      setStatus(`Sent row ${rowIndex + 1} nickname: ${result.built.scriptCall}`, false);
+    } catch (error) {
+      setStatus(`Row ${rowIndex + 1} nickname failed: ${error.message}`, true);
+    }
+  }, 700));
+}
+
+async function sendAllRowNicknames() {
+  const rows = readMappingsFromForm()
+    .filter((row) => String(row.username || "").trim() && String(row.nicknameInput || "").trim())
+    .map((row) => ({ username: row.username, input: row.nicknameInput }));
+
+  const result = await getJson("/send-row-nicknames", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      rows,
+      baseUrl: document.getElementById("nicknameBaseUrl").value || document.getElementById("vmixBaseUrl").value,
+      selectedName: document.getElementById("nicknameSelectedName").value || "Nickname.Text",
+    })
+  });
+  return result;
 }
 
 function updatePreview() {
@@ -436,6 +548,13 @@ function updatePreview() {
     const selectedName = config.vmix.nickname.selectedName || "Nickname.Text";
     const nickname = lastCurrent?.spectated_name || "EXAMPLE";
     lines.push(`Nickname: API.Function("SetText", Input:="${nicknameInput}", SelectedName:="${selectedName}", Value:="${nickname}")`);
+  }
+
+  const rowNicknameCount = readMappingsFromForm()
+    .filter((row) => String(row.username || "").trim() && String(row.nicknameInput || "").trim())
+    .length;
+  if (rowNicknameCount) {
+    lines.push(`Row nicknames: ${rowNicknameCount} configured row(s), SelectedName=${config.vmix.nickname?.selectedName || "Nickname.Text"}`);
   }
 
   document.getElementById("preview").textContent = lines.join("\n");
@@ -514,6 +633,15 @@ document.getElementById("test-nickname").addEventListener("click", async () => {
       body: JSON.stringify({ value: lastCurrent?.spectated_name || "НУЖНЫЙ_ТЕКСТ" })
     });
     setStatus(`vMix nickname call ok: ${result.built.scriptCall} URL: ${result.built.url}`, false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+});
+
+document.getElementById("send-all-row-nicknames").addEventListener("click", async () => {
+  try {
+    const result = await sendAllRowNicknames();
+    setStatus(`Sent all row nicknames: ${result.count} row(s)`, false);
   } catch (error) {
     setStatus(error.message, true);
   }

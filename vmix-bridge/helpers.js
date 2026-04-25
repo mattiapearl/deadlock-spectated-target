@@ -7,7 +7,7 @@ function loadJson(fs, filePath) {
 }
 
 function buildDefaultMappings() {
-    return Array.from({ length: MAPPING_SLOTS }, () => ({ username: "", value: "" }));
+    return Array.from({ length: MAPPING_SLOTS }, () => ({ username: "", value: "", nicknameInput: "" }));
 }
 
 function buildTargetKey(target) {
@@ -43,6 +43,7 @@ function normalizeMappings(mappings) {
         normalized[i] = {
             username: typeof row.username === "string" ? row.username : "",
             value: typeof row.value === "string" ? row.value : "",
+            nicknameInput: typeof row.nicknameInput === "string" ? row.nicknameInput : "",
         };
     }
 
@@ -64,6 +65,7 @@ function findMappingForTarget(mappings, target) {
                 rowIndex: i,
                 username: normalized[i].username,
                 value: normalized[i].value,
+                nicknameInput: normalized[i].nicknameInput,
             };
         }
     }
@@ -114,6 +116,32 @@ function buildNicknameText(target) {
     return String((target && (target.spectated_name || target.player_name || target.hero_name)) || "").trim();
 }
 
+function buildVmixTextCall(baseUrl, input, selectedName, value) {
+    const normalizedBaseUrl = String(baseUrl || "").trim();
+    const normalizedInput = String(input || "").trim();
+    const normalizedSelectedName = String(selectedName || "").trim();
+    const normalizedValue = String(value == null ? "" : value);
+
+    if (!normalizedBaseUrl || !normalizedInput || !normalizedSelectedName) {
+        throw new Error("vMix text config is incomplete. baseUrl, input, and selectedName are required.");
+    }
+
+    const url = new URL(normalizedBaseUrl);
+    url.searchParams.set("Function", "SetText");
+    url.searchParams.set("Input", normalizedInput);
+    url.searchParams.set("SelectedName", normalizedSelectedName);
+    url.searchParams.set("Value", normalizedValue);
+
+    return {
+        functionName: "SetText",
+        input: normalizedInput,
+        selectedName: normalizedSelectedName,
+        value: normalizedValue,
+        url: url.toString(),
+        scriptCall: `API.Function("SetText", Input:="${escapeVmixScriptString(normalizedInput)}", SelectedName:="${escapeVmixScriptString(normalizedSelectedName)}", Value:="${escapeVmixScriptString(normalizedValue)}")`,
+    };
+}
+
 function buildVmixNicknameCall(config, target) {
     const vmix = config.vmix || {};
     const nickname = vmix.nickname || {};
@@ -122,24 +150,45 @@ function buildVmixNicknameCall(config, target) {
     const selectedName = String(nickname.selectedName || "Nickname.Text").trim();
     const value = buildNicknameText(target);
 
-    if (!baseUrl || !input || !selectedName || !value) {
-        throw new Error("vMix nickname config is incomplete. baseUrl, input, selectedName, and nickname value are required.");
+    if (!value) {
+        throw new Error("vMix nickname value is required.");
     }
 
-    const url = new URL(baseUrl);
-    url.searchParams.set("Function", "SetText");
-    url.searchParams.set("Input", input);
-    url.searchParams.set("SelectedName", selectedName);
-    url.searchParams.set("Value", value);
+    return buildVmixTextCall(baseUrl, input, selectedName, value);
+}
 
-    return {
-        functionName: "SetText",
-        input,
-        selectedName,
-        value,
-        url: url.toString(),
-        scriptCall: `API.Function("SetText", Input:="${escapeVmixScriptString(input)}", SelectedName:="${escapeVmixScriptString(selectedName)}", Value:="${escapeVmixScriptString(value)}")`,
-    };
+function buildRosterSelectedName(template, index) {
+    const value = String(template || "Player{index}.Text");
+    return value
+        .replace(/\{index\}/g, String(index))
+        .replace(/\{slot\}/g, String(index))
+        .replace(/\{n\}/g, String(index));
+}
+
+function buildVmixRosterCalls(config, rosters) {
+    const vmix = config.vmix || {};
+    const roster = vmix.roster || {};
+    const baseUrl = String(roster.baseUrl || vmix.baseUrl || "").trim();
+    const selectedNameTemplate = String(roster.selectedNameTemplate || "Player{index}.Text").trim();
+    const maxPlayers = Math.max(1, Math.min(12, Number.parseInt(roster.maxPlayers || 6, 10) || 6));
+    const calls = [];
+
+    for (const team of ["sapphire", "amber"]) {
+        const input = String(roster[`${team}Input`] || "").trim();
+        if (!input) continue;
+
+        const names = Array.isArray(rosters && rosters[team]) ? rosters[team] : [];
+        for (let i = 0; i < maxPlayers; i++) {
+            calls.push(buildVmixTextCall(
+                baseUrl,
+                input,
+                buildRosterSelectedName(selectedNameTemplate, i + 1),
+                names[i] || ""
+            ));
+        }
+    }
+
+    return calls;
 }
 
 module.exports = {
@@ -152,5 +201,7 @@ module.exports = {
     findMappingForTarget,
     addAvailableUsername,
     buildVmixCall,
+    buildVmixTextCall,
     buildVmixNicknameCall,
+    buildVmixRosterCalls,
 };

@@ -16,18 +16,18 @@
       "selectedName": "Nickname.Text"
     },
     "mappings": [
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" },
-      { "username": "", "value": "" }
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" },
+      { "username": "", "value": "", "nicknameInput": "" }
     ]
   }
 }

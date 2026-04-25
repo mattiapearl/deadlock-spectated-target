@@ -192,9 +192,11 @@ http://localhost:5015
 
 - subscribes to Ably channel updates
 - keeps a live list of usernames seen in the current game
-- provides a 12-row `username -> value` mapping table with searchable username inputs and choose dropdowns
+- provides a 12-row `username -> value -> nickname input` mapping table with searchable username inputs and choose dropdowns
+- colors mapping rows by known Sapphire/Amber team
 - supports an unmapped fallback value so unmapped players do not leave vMix on the previous mapped camera
-- optionally sends a second `SetText` nickname call to a separate vMix input/field
+- optionally sends a second live `SetText` nickname call to a separate vMix input/field
+- sends per-row nickname `SetText` calls to configured input numbers when rows are edited, with a resend-all button
 - clears available usernames for a new game with one click
 - writes to local vMix via a configured shortcut function such as `SetLayer`
 - local UI to modify settings
@@ -226,8 +228,8 @@ Use the vMix bridge UI, or copy `vmix-bridge/config.example.json` to local-only 
       "selectedName": "Nickname.Text"
     },
     "mappings": [
-      { "username": "PlayerOne", "value": "100" },
-      { "username": "PlayerTwo", "value": "101" }
+      { "username": "PlayerOne", "value": "100", "nicknameInput": "86" },
+      { "username": "PlayerTwo", "value": "101", "nicknameInput": "87" }
     ]
   }
 }

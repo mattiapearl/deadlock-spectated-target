@@ -116,13 +116,14 @@
         </label>
 
         <h3>Username → Value mapping table</h3>
-        <p class="muted small">Username cells are searchable. Type in the username box to filter observed names, use the per-row choose dropdown, or click a username chip above to fill the focused/first empty row.</p>
+        <p class="muted small">Username cells are searchable. Rows turn sapphire/amber when the selected username's team is known. The <strong>Nickname input</strong> column sends <code>SetText</code> to that vMix input with <code>SelectedName=Nickname.Text</code> after a row edit settles. Use <strong>Send all row nicknames</strong> to resend every row.</p>
         <table class="mapping-table">
           <thead>
             <tr>
               <th>#</th>
               <th>Username</th>
               <th>Value sent to vMix</th>
+              <th>Nickname input</th>
             </tr>
           </thead>
           <tbody id="mapping-body"></tbody>
@@ -132,6 +133,7 @@
           <button type="submit">Save and reconnect</button>
           <button type="button" id="test-vmix">Test current mapping</button>
           <button type="button" id="test-nickname">Test nickname text</button>
+          <button type="button" id="send-all-row-nicknames">Send all row nicknames</button>
         </div>
       </form>
 
